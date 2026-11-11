@@ -1,0 +1,38 @@
+export const paletas = {
+  claro: {
+    background: '#F2F0ED',
+    surface: '#FFFFFF',
+    header: '#1F3A5A',
+    headerText: '#FFFFFF',
+    headerSubtext: '#C9D3E0',
+    accentLine: '#F5B800',
+    title: '#8C2F2F',
+    text: '#1A1A1A',
+    textMuted: '#5F6368',
+    border: '#C9C9C9',
+    inputBg: '#FFFFFF',
+    primary: '#0F5A9C',
+    primaryText: '#FFFFFF',
+    link: '#0F5A9C',
+    error: '#B3261E',
+  },
+  oscuro: {
+    background: '#0D1520',
+    surface: '#16202D',
+    header: '#0D1520',
+    headerText: '#FFFFFF',
+    headerSubtext: '#B8C2CF',
+    accentLine: '#F5B800',
+    title: '#F29B97',
+    text: '#E8EDF3',
+    textMuted: '#9AA6B5',
+    border: '#3A4756',
+    inputBg: '#16202D',
+    primary: '#3B82D6',
+    primaryText: '#FFFFFF',
+    link: '#6FB0F5',
+    error: '#FF8A80',
+  },
+};
+
+export type Paleta = typeof paletas.claro;
