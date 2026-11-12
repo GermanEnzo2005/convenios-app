@@ -1,7 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { useTema } from '@/tema/ProveedorTema';
 import { Convenio } from '@/types/convenio';
-import { formatearFecha } from '@/utils/fechas';
 import { Texto } from '../atomos/Texto';
 import { Insignia } from '../compartidos/Insignia';
 
@@ -33,7 +32,7 @@ export function FilaConvenioFirmado({ convenio, onAbrir }: Props) {
             {convenio.titulo}
             </Texto>
         </View>
-        <Insignia texto={convenio.fechaFirma ? `Firmado ${formatearFecha(convenio.fechaFirma)}` : 'Firmado'} tono="exito" />
+        <Insignia texto="Firmado" tono="exito" />
         </Pressable>
     );
 }

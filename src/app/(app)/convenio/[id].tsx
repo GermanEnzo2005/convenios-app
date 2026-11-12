@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Boton } from '@/componentes/atomos/Boton';
 import { Texto } from '@/componentes/atomos/Texto';
@@ -7,24 +7,28 @@ import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla
 import { Insignia } from '@/componentes/compartidos/Insignia';
 import { FilaDato } from '@/componentes/convenio/FilaDato';
 import { SeccionDetalle } from '@/componentes/convenio/SeccionDetalle';
-import { evaluarFirma, firmarConvenio, obtenerConvenio } from '@/services/convenios.service';
-import { useTema } from '@/tema/ProveedorTema';
+import { useSesion } from '@/contexto/ContextoSesion';
+import { esErrorApi } from '@/services/api';
 import {
-    Convenio,
-    Documento,
-    ETIQUETA_ESTADO,
-    ETIQUETA_TIPO,
-    ETIQUETA_TIPO_DOCUMENTO,
-    TONO_ESTADO,
-} from '@/types/convenio';
-import { estadoVencimiento, formatearFecha } from '@/utils/fechas';
+    evaluarFirma,
+    firmarConvenio,
+    obtenerConvenio,
+    obtenerHistorial,
+    obtenerPartes,
+} from '@/services/convenios.service';
+import { useTema } from '@/tema/ProveedorTema';
+import { CambioEstado, Convenio, etiquetaEstado, Parte, tonoEstado } from '@/types/convenio';
+import { formatearFecha } from '@/utils/fechas';
 
 export default function DetalleConvenio() {
     const { colores } = useTema();
     const router = useRouter();
+    const { token, usuario, cerrarSesion } = useSesion();
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const [convenio, setConvenio] = useState<Convenio | null>(null);
+    const [partes, setPartes] = useState<Parte[] | null>(null); // null = no se pudieron cargar
+    const [historial, setHistorial] = useState<CambioEstado[] | null>(null);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [firmando, setFirmando] = useState(false);
@@ -33,36 +37,60 @@ export default function DetalleConvenio() {
         setCargando(true);
         setError(null);
         try {
-        setConvenio(await obtenerConvenio(Number(id)));
+        const numero = Number(id);
+        const [rConvenio, rPartes, rHistorial] = await Promise.allSettled([
+            obtenerConvenio(token, numero),
+            obtenerPartes(token, numero),
+            obtenerHistorial(token, numero),
+        ]);
+
+        const sesionVencida = [rConvenio, rPartes, rHistorial].some(
+            (r) => r.status === 'rejected' && esErrorApi(r.reason) && r.reason.estado === 401,
+        );
+        if (sesionVencida) {
+            await cerrarSesion();
+            return;
+        }
+
+        if (rConvenio.status === 'rejected') throw rConvenio.reason;
+        setConvenio(rConvenio.value);
+        setPartes(rPartes.status === 'fulfilled' ? rPartes.value : null);
+        setHistorial(rHistorial.status === 'fulfilled' ? rHistorial.value : null);
         } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se pudo cargar el convenio.');
+        setError(
+            esErrorApi(e) && e.estado === 404
+            ? 'No se encontró el convenio.'
+            : e instanceof Error
+                ? e.message
+                : 'No se pudo cargar el convenio.',
+        );
         } finally {
         setCargando(false);
         }
-    }, [id]);
+    }, [id, token]);
 
     useEffect(() => {
         cargar();
     }, [cargar]);
 
-    const abrirPdf = async (documento: Documento) => {
-        try {
-        await Linking.openURL(documento.url);
-        } catch {
-        Alert.alert('No se pudo abrir el PDF', 'Verificá tu conexión o que el dispositivo tenga un visor de PDF.');
-        }
-    };
-
     const firmar = async () => {
         if (!convenio) return;
         setFirmando(true);
         try {
-        const actualizado = await firmarConvenio(convenio.id);
-        setConvenio(actualizado);
-        Alert.alert('Convenio firmado', `${actualizado.codigo} quedó firmado.`, [
-            { text: 'Aceptar', onPress: () => router.back() },
-        ]);
+        const nombre = usuario?.nombre ?? 'Decano';
+        await firmarConvenio(token, convenio.id, nombre);
+        setConvenio({ ...convenio, estado: 'firmado', firmadoPorDecano: true, firmaDecano: nombre });
+        Alert.alert(
+            'Convenio firmado',
+            `${convenio.codigo} quedó firmado.`,
+            [{ text: 'Aceptar', onPress: () => router.back() }],
+            { cancelable: false },
+        );
         } catch (e) {
+        if (esErrorApi(e) && e.estado === 401) {
+            await cerrarSesion();
+            return;
+        }
         Alert.alert('No se pudo firmar', e instanceof Error ? e.message : 'Error desconocido');
         } finally {
         setFirmando(false);
@@ -73,13 +101,15 @@ export default function DetalleConvenio() {
         if (!convenio) return;
         Alert.alert(
         'Firmar convenio',
-        `Se registrará tu firma en ${convenio.codigo} y su estado pasará de Aprobado a Firmado. ¿Confirmás?`,
+        `Se registrará tu firma en ${convenio.codigo} y su estado pasará a Firmado. ¿Confirmás?`,
         [
             { text: 'Cancelar', style: 'cancel' },
             { text: 'Firmar', onPress: firmar },
         ],
         );
     };
+
+    const firma = convenio ? evaluarFirma(convenio) : null;
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
@@ -105,92 +135,80 @@ export default function DetalleConvenio() {
                 {convenio.titulo}
                 </Texto>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                <Insignia texto={ETIQUETA_ESTADO[convenio.estado]} tono={TONO_ESTADO[convenio.estado]} />
-                <Insignia texto={ETIQUETA_TIPO[convenio.tipo]} tono="info" />
-                <Insignia texto={estadoVencimiento(convenio.fechaVencimiento).texto} tono={estadoVencimiento(convenio.fechaVencimiento).tono} />
+                <Insignia texto={etiquetaEstado(convenio.estado)} tono={tonoEstado(convenio.estado)} />
+                <Insignia texto={convenio.tipoNombre} tono="info" />
                 </View>
             </View>
 
             <SeccionDetalle titulo="Datos generales">
-                <FilaDato etiqueta="Unidad responsable" valor={convenio.unidad} />
-                <FilaDato etiqueta="Fecha de creación" valor={formatearFecha(convenio.fechaCreacion)} />
+                <FilaDato etiqueta="Código" valor={convenio.codigo} />
+                <FilaDato etiqueta="Tipo de instrumento" valor={convenio.tipoNombre} />
                 <FilaDato
-                etiqueta="Vencimiento"
-                valor={convenio.fechaVencimiento ? formatearFecha(convenio.fechaVencimiento) : 'Sin vencimiento registrado'}
+                etiqueta="Fecha de creación"
+                valor={convenio.fechaCreacion ? formatearFecha(convenio.fechaCreacion) : 'Sin fecha'}
                 />
-                <FilaDato etiqueta="Objeto" valor={convenio.objeto} />
-                <FilaDato etiqueta="Alcance" valor={convenio.alcance} />
-                {convenio.antecedente ? (
-                <FilaDato etiqueta="Antecedente" valor={`${convenio.antecedente.codigo} · ${convenio.antecedente.titulo}`} />
+                {convenio.convenioPadreId ? (
+                <FilaDato etiqueta="Convenio de origen" valor={`Convenio N.º ${convenio.convenioPadreId}`} />
                 ) : null}
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Partes y representantes">
-                {convenio.partes.map((p, i) => (
-                <View key={`${p.unidad}-${i}`} style={{ gap: 2 }}>
-                    <Texto variante="etiqueta">{p.unidad}</Texto>
-                    <Texto variante="subtitulo">{p.tipoUnidad}</Texto>
-                    <Texto variante="subtitulo">
-                    {p.representante} · {p.email}
-                    </Texto>
-                </View>
-                ))}
-            </SeccionDetalle>
-
-            <SeccionDetalle titulo="Documentos">
-                {convenio.documentos.length === 0 ? (
-                <Texto variante="subtitulo">Este convenio no tiene documentos adjuntos.</Texto>
+                {partes === null ? (
+                <Texto variante="subtitulo">No se pudieron cargar las partes.</Texto>
+                ) : partes.length === 0 ? (
+                <Texto variante="subtitulo">Este convenio todavía no tiene partes registradas.</Texto>
                 ) : (
-                convenio.documentos.map((d) => (
-                    <View key={d.id} style={{ gap: 8 }}>
-                    <View style={{ gap: 2 }}>
-                        <Texto variante="etiqueta">{d.nombre}</Texto>
-                        <Texto variante="nota">{ETIQUETA_TIPO_DOCUMENTO[d.tipo]} · PDF</Texto>
-                    </View>
-                    <Boton
-                        titulo="Ver PDF"
-                        variante="contorno"
-                        tamano="chico"
-                        onPress={() => abrirPdf(d)}
-                        accessibilityLabel={`Ver PDF: ${d.nombre}`}
-                    />
+                partes.map((p) => (
+                    <View key={p.id} style={{ gap: 2 }}>
+                    <Texto variante="etiqueta">{p.unidad}</Texto>
+                    {p.tipoUnidad ? <Texto variante="nota">{p.tipoUnidad}</Texto> : null}
+                    <Texto variante="subtitulo">
+                        {p.representante}
+                        {p.email ? ` · ${p.email}` : ''}
+                    </Texto>
+                    {p.telefono ? <Texto variante="subtitulo">{p.telefono}</Texto> : null}
                     </View>
                 ))
                 )}
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Firmas">
-                <FilaDato etiqueta="Gestor" valor={convenio.firmaGestor ?? 'Pendiente'} />
+                <FilaDato
+                etiqueta="Gestor"
+                valor={convenio.firmadoPorGestor ? (convenio.firmaGestor ?? 'Firmado') : 'Pendiente'}
+                />
                 <FilaDato
                 etiqueta="Decano"
-                valor={
-                    convenio.firmaDecano
-                    ? `${convenio.firmaDecano}${convenio.fechaFirma ? ` · ${formatearFecha(convenio.fechaFirma)}` : ''}`
-                    : 'Pendiente'
-                }
+                valor={convenio.firmadoPorDecano ? (convenio.firmaDecano ?? 'Firmado') : 'Pendiente'}
                 />
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Historial de estados">
-                {[...convenio.historial].reverse().map((h, i) => (
-                <View key={`${h.fecha}-${i}`} style={{ gap: 2 }}>
+                {historial === null ? (
+                <Texto variante="subtitulo">No se pudo cargar el historial.</Texto>
+                ) : historial.length === 0 ? (
+                <Texto variante="subtitulo">Todavía no hay cambios de estado registrados.</Texto>
+                ) : (
+                historial.map((h) => (
+                    <View key={h.id} style={{ gap: 2 }}>
                     <Texto variante="etiqueta">
-                    {h.estadoAnterior ? `${ETIQUETA_ESTADO[h.estadoAnterior]} → ` : ''}
-                    {ETIQUETA_ESTADO[h.estadoNuevo]}
+                        {h.estadoAnterior ? `${etiquetaEstado(h.estadoAnterior)} → ` : ''}
+                        {etiquetaEstado(h.estadoNuevo)}
                     </Texto>
                     <Texto variante="nota">
-                    {formatearFecha(h.fecha)} · {h.usuario}
+                        {h.fecha ? formatearFecha(h.fecha) : 'Sin fecha'} · {h.usuario}
                     </Texto>
-                    <Texto variante="subtitulo">{h.fundamento}</Texto>
-                </View>
-                ))}
+                    {h.fundamento ? <Texto variante="subtitulo">{h.fundamento}</Texto> : null}
+                    </View>
+                ))
+                )}
             </SeccionDetalle>
 
-            {evaluarFirma(convenio).puede ? (
+            {firma?.puede ? (
                 <Boton titulo="Firmar convenio" onPress={confirmarFirma} cargando={firmando} />
             ) : (
                 <View style={{ backgroundColor: colores.surface, borderRadius: 14, borderWidth: 1, borderColor: colores.border, padding: 14 }}>
-                <Texto variante="subtitulo">{evaluarFirma(convenio).motivo}</Texto>
+                <Texto variante="subtitulo">{firma?.motivo}</Texto>
                 </View>
             )}
             </ScrollView>

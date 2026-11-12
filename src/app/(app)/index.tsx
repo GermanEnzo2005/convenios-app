@@ -7,13 +7,16 @@ import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla
 import { Insignia } from '@/componentes/compartidos/Insignia';
 import { FilaConvenioFirmado } from '@/componentes/inicio/FilaConvenioFirmado';
 import { TarjetaConvenio } from '@/componentes/inicio/TarjetaConvenio';
-import { obtenerConvenios, obtenerUltimosFirmados } from '@/services/convenios.service';
+import { useSesion } from '@/contexto/ContextoSesion';
+import { esErrorApi } from '@/services/api';
+import { obtenerConvenios, pendientesDeFirma, ultimosFirmados } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { Convenio } from '@/types/convenio';
 
 export default function Inicio() {
     const { colores } = useTema();
     const router = useRouter();
+    const { token, usuario, cerrarSesion } = useSesion();
 
     const [primeraCarga, setPrimeraCarga] = useState(true);
     const [refrescando, setRefrescando] = useState(false);
@@ -23,22 +26,23 @@ export default function Inicio() {
 
     const cargar = useCallback(async () => {
         try {
-        const [aprobados, ultimos] = await Promise.all([
-            obtenerConvenios({ estado: 'aprobado' }),
-            obtenerUltimosFirmados(3),
-        ]);
-        setPorFirmar(aprobados);
-        setFirmados(ultimos);
+        const todos = await obtenerConvenios(token);
+        setPorFirmar(pendientesDeFirma(todos));
+        setFirmados(ultimosFirmados(todos, 3));
         setError(null);
         } catch (e) {
+        if (esErrorApi(e) && e.estado === 401) {
+            await cerrarSesion(); // sesión vencida: vuelve al login
+            return;
+        }
         setError(e instanceof Error ? e.message : 'No se pudo cargar la información.');
         } finally {
         setPrimeraCarga(false);
         setRefrescando(false);
         }
-    }, []);
+    }, [token]);
 
-    // Recarga cada vez que la pantalla vuelve a estar en foco (por ejemplo, después de firmar).
+    // Recarga cada vez que la pantalla vuelve a estar en foco.
     useFocusEffect(
         useCallback(() => {
         cargar();
@@ -56,7 +60,7 @@ export default function Inicio() {
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
         <EncabezadoPantalla
-            titulo="Hola, decano"
+            titulo={`Hola, ${usuario?.nombre ?? 'decano'}`}
             subtitulo="Decanato · Facultad de Ingeniería"
             accion={{ icono: 'person-circle-outline', etiqueta: 'Perfil y ajustes', onPress: () => router.push('/perfil') }}
         />

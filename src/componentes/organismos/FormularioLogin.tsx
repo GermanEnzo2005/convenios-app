@@ -16,7 +16,7 @@ export function FormularioLogin({ onSubmit }: Props) {
 
     const enviar = async () => {
         const nuevos: typeof errores = {};
-        if (!usuario.trim()) nuevos.usuario = 'Ingresá tu usuario o correo.';
+        if (!usuario.trim()) nuevos.usuario = 'Ingresá tu correo.';
         if (!contrasena) nuevos.contrasena = 'Ingresá tu contraseña.';
         setErrores(nuevos);
         if (Object.keys(nuevos).length) return;
@@ -38,7 +38,7 @@ export function FormularioLogin({ onSubmit }: Props) {
             <Texto variante="subtitulo">Ingresá con tu cuenta institucional.</Texto>
         </View>
 
-        <CampoFormulario etiqueta="Usuario o correo" error={errores.usuario}>
+        <CampoFormulario etiqueta="Correo electrónico" error={errores.usuario}>
             <View style={{ flexDirection: 'row' }}>
             <CampoTexto
                 value={usuario}
@@ -48,7 +48,7 @@ export function FormularioLogin({ onSubmit }: Props) {
                 autoCorrect={false}
                 keyboardType="email-address"
                 tieneError={!!errores.usuario}
-                accessibilityLabel="Usuario o correo"
+                accessibilityLabel="Correo electrónico"
             />
             </View>
         </CampoFormulario>

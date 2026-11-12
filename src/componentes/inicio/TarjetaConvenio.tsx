@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useTema } from '@/tema/ProveedorTema';
-import { Convenio, ETIQUETA_ESTADO, ETIQUETA_TIPO, TONO_ESTADO } from '@/types/convenio';
+import { Convenio, etiquetaEstado, tonoEstado } from '@/types/convenio';
 import { formatearFecha } from '@/utils/fechas';
 import { Boton } from '../atomos/Boton';
 import { Texto } from '../atomos/Texto';
@@ -26,13 +26,11 @@ export function TarjetaConvenio({ convenio, onAbrir }: Props) {
         <Texto variante="etiqueta" style={{ fontSize: 16 }}>
             {convenio.titulo}
         </Texto>
-        <Texto variante="subtitulo">
-            {ETIQUETA_TIPO[convenio.tipo]} · {convenio.unidad}
-        </Texto>
+        <Texto variante="subtitulo">{convenio.tipoNombre}</Texto>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Insignia texto={ETIQUETA_ESTADO[convenio.estado]} tono={TONO_ESTADO[convenio.estado]} />
-            <Insignia texto={`Creado el ${formatearFecha(convenio.fechaCreacion)}`} />
+            <Insignia texto={etiquetaEstado(convenio.estado)} tono={tonoEstado(convenio.estado)} />
+            <Insignia texto={convenio.fechaCreacion ? `Creado el ${formatearFecha(convenio.fechaCreacion)}` : 'Sin fecha de creación'} />
         </View>
 
         <Boton titulo="Ver convenio" tamano="chico" onPress={onAbrir} accessibilityLabel={`Ver convenio ${convenio.codigo}`} />
