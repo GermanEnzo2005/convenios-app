@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { cerrarSesionApi, login } from '@/services/auth.service';
+import { cerrarSesionApi, obtenerUsuario, usuarioDesdeApi } from '@/services/auth.service';
 import { Usuario } from '@/types/usuario';
 
 const CLAVE_TOKEN = 'sesion_token';
@@ -10,7 +10,7 @@ type Sesion = {
     token: string | null;
     usuario: Usuario | null;
     cargando: boolean;
-    iniciarSesion: (correo: string, contrasena: string) => Promise<void>;
+    completarSesion: (token: string, correo: string, datosUsuario?: unknown) => Promise<void>;
     cerrarSesion: () => Promise<void>;
 };
 
@@ -19,7 +19,7 @@ const ContextoSesion = createContext<Sesion | null>(null);
 async function borrarSesionGuardada() {
     await SecureStore.deleteItemAsync(CLAVE_TOKEN).catch(() => {});
     await SecureStore.deleteItemAsync(CLAVE_USUARIO).catch(() => {});
-    }
+}
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
     const [token, setToken] = useState<string | null>(null);
@@ -47,12 +47,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
         })();
     }, []);
 
-    const iniciarSesion = async (correo: string, contrasena: string) => {
-        const respuesta = await login(correo, contrasena);
-        await SecureStore.setItemAsync(CLAVE_TOKEN, respuesta.token);
-        await SecureStore.setItemAsync(CLAVE_USUARIO, JSON.stringify(respuesta.usuario));
-        setToken(respuesta.token);
-        setUsuario(respuesta.usuario);
+    // Se usa después de verificar el código: recién ahí se guarda el token y se entra a la app.
+    const completarSesion = async (nuevoToken: string, correo: string, datosUsuario?: unknown) => {
+        // Se usan los datos que mandó el login; si no vinieron, se piden a la API.
+        const datos = usuarioDesdeApi(datosUsuario, correo) ?? (await obtenerUsuario(nuevoToken, correo));
+        await SecureStore.setItemAsync(CLAVE_TOKEN, nuevoToken);
+        await SecureStore.setItemAsync(CLAVE_USUARIO, JSON.stringify(datos));
+        setToken(nuevoToken);
+        setUsuario(datos);
     };
 
     const cerrarSesion = async () => {
@@ -63,7 +65,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     };
 
     return (
-        <ContextoSesion.Provider value={{ token, usuario, cargando, iniciarSesion, cerrarSesion }}>
+        <ContextoSesion.Provider value={{ token, usuario, cargando, completarSesion, cerrarSesion }}>
         {children}
         </ContextoSesion.Provider>
     );

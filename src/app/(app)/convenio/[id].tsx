@@ -140,16 +140,33 @@ export default function DetalleConvenio() {
                 </View>
             </View>
 
-            <SeccionDetalle titulo="Datos generales">
-                <FilaDato etiqueta="Código" valor={convenio.codigo} />
-                <FilaDato etiqueta="Tipo de instrumento" valor={convenio.tipoNombre} />
-                <FilaDato
-                etiqueta="Fecha de creación"
-                valor={convenio.fechaCreacion ? formatearFecha(convenio.fechaCreacion) : 'Sin fecha'}
-                />
-                {convenio.convenioPadreId ? (
-                <FilaDato etiqueta="Convenio de origen" valor={`Convenio N.º ${convenio.convenioPadreId}`} />
-                ) : null}
+            <SeccionDetalle titulo="Documentos">
+                {convenio.documentos.length === 0 ? (
+                <Texto variante="subtitulo">Este convenio todavía no tiene documentos.</Texto>
+                ) : (
+                convenio.documentos.map((d, i) => (
+                    <View key={d.id} style={{ gap: 8 }}>
+                    <View style={{ gap: 2 }}>
+                        <Texto variante="etiqueta">Documento {i + 1}</Texto>
+                        <Texto variante="nota">
+                        PDF{d.creadoEn ? ` · subido el ${formatearFecha(d.creadoEn)}` : ''}
+                        </Texto>
+                    </View>
+                    <Boton
+                        titulo="Ver PDF"
+                        variante="contorno"
+                        tamano="chico"
+                        onPress={() =>
+                        router.push({
+                            pathname: '/documento/[id]',
+                            params: { id: String(d.id), titulo: `Documento ${i + 1}`, codigo: convenio.codigo },
+                        })
+                        }
+                        accessibilityLabel={`Ver PDF del documento ${i + 1}`}
+                    />
+                    </View>
+                ))
+                )}
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Partes y representantes">

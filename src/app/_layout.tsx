@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ProveedorNotificaciones } from '@/contexto/ContextoNotificaciones';
+import { ProveedorPerfil } from '@/contexto/ContextoPerfil';
 import { ProveedorSesion } from '@/contexto/ContextoSesion';
 import { ProveedorTema } from '@/tema/ProveedorTema';
 
@@ -9,8 +11,12 @@ export default function LayoutRaiz() {
     <SafeAreaProvider>
       <ProveedorTema>
         <ProveedorSesion>
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }} />
+          <ProveedorPerfil>
+            <ProveedorNotificaciones>
+              <StatusBar style="light" />
+              <Stack screenOptions={{ headerShown: false }} />
+            </ProveedorNotificaciones>
+          </ProveedorPerfil>
         </ProveedorSesion>
       </ProveedorTema>
     </SafeAreaProvider>

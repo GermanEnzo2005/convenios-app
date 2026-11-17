@@ -12,12 +12,18 @@ import { esErrorApi } from '@/services/api';
 import { obtenerConvenios, pendientesDeFirma, ultimosFirmados } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { Convenio } from '@/types/convenio';
+import { CampoBusqueda } from '@/componentes/compartidos/CampoBusqueda';
+import { Avatar } from '@/componentes/compartidos/Avatar';
+import { usePerfil } from '@/contexto/ContextoPerfil';
+import { CampanaNotificaciones } from '@/componentes/compartidos/CampanaNotificaciones';
 
 export default function Inicio() {
     const { colores } = useTema();
     const router = useRouter();
     const { token, usuario, cerrarSesion } = useSesion();
-
+    const { fotoUri } = usePerfil();
+    const [consulta, setConsulta] = useState('');
+    
     const [primeraCarga, setPrimeraCarga] = useState(true);
     const [refrescando, setRefrescando] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -62,8 +68,23 @@ export default function Inicio() {
         <EncabezadoPantalla
             titulo={`Hola, ${usuario?.nombre ?? 'decano'}`}
             subtitulo="Decanato · Facultad de Ingeniería"
-            accion={{ icono: 'person-circle-outline', etiqueta: 'Perfil y ajustes', onPress: () => router.push('/perfil') }}
-        />
+            accion={{
+            contenido: <Avatar uri={fotoUri} nombre={usuario?.nombre ?? ''} tamano={36} />,
+            etiqueta: 'Perfil y ajustes',
+            onPress: () => router.push('/perfil'),
+            }}
+        >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+                <CampoBusqueda
+                valor={consulta}
+                onCambio={setConsulta}
+                onEnviar={() => router.push({ pathname: '/buscar', params: { q: consulta.trim() } })}
+                />
+            </View>
+            <CampanaNotificaciones onPress={() => router.push('/notificaciones')} />
+            </View>
+        </EncabezadoPantalla>
 
         {primeraCarga ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

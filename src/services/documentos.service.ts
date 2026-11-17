@@ -1,10 +1,40 @@
+import { fetch } from 'expo/fetch';
 import { File, Paths } from 'expo-file-system';
-import { Documento } from '@/types/convenio';
+import { ErrorApi, esErrorApi, URL_BASE } from './api';
 
-// Descarga el PDF a la caché de la app y devuelve el archivo local.
-// Cuando haya API: los archivos van a estar protegidos, así que hay que sumar
-// las opciones { headers: { Authorization: `Bearer ${token}` } } en la descarga.
-export async function descargarDocumento(documento: Documento): Promise<File> {
-    const destino = new File(Paths.cache, `documento-${documento.id}.pdf`);
-    return File.downloadFileAsync(documento.url, destino, { idempotent: true });
+function errorDescarga(mensaje: string, estado: number): ErrorApi {
+    const error = new Error(mensaje) as ErrorApi;
+    error.estado = estado;
+    return error;
+}
+
+// Los archivos están protegidos: se piden a la API con el token y se guardan en la caché de la app.
+export async function descargarDocumento(token: string | null, documentoId: number): Promise<File> {
+    try {
+        const respuesta = await fetch(`${URL_BASE}/documentos/${documentoId}/download`, {
+        headers: {
+            Accept: 'application/pdf',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        });
+
+        if (!respuesta.ok) {
+        const mensaje =
+            respuesta.status === 401
+            ? 'Tu sesión venció. Ingresá de nuevo.'
+            : respuesta.status === 403
+                ? 'No tenés permiso para ver este documento.'
+                : respuesta.status === 404
+                ? 'El documento no existe o fue eliminado.'
+                : `No se pudo descargar el documento (código ${respuesta.status}).`;
+        throw errorDescarga(mensaje, respuesta.status);
+        }
+
+        const archivo = new File(Paths.cache, `documento-${documentoId}.pdf`);
+        await archivo.write(await respuesta.bytes());
+        return archivo;
+    } catch (e) {
+        if (esErrorApi(e)) throw e;
+        throw errorDescarga('No se pudo descargar el documento. Verificá tu conexión.', 0);
+    }
 }

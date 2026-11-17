@@ -1,39 +1,40 @@
 import { Usuario } from '@/types/usuario';
 import { esErrorApi, llamarApi } from './api';
 
-export type LoginResult = { token: string; usuario: Usuario };
+type UsuarioApi = {
+    id?: number;
+    name?: string | null;
+    nombre?: string | null;
+    email?: string | null;
+    correo?: string | null;
+    telefono?: string | null;
+    rol?: string | null;
+};
 
-type UsuarioApi = { id: number; name: string; email: string; telefono?: string | null; rol?: string | null };
-
-async function obtenerUsuario(token: string, correo: string): Promise<Usuario> {
-    try {
-        const u = await llamarApi<UsuarioApi>('/user', { token });
-        return { id: u.id, nombre: u.name, correo: u.email, telefono: u.telefono ?? null, rol: u.rol ?? 'sin rol' };
-    } catch (e) {
-        // Si la API todavía no tiene la ruta /user, se sigue con datos mínimos.
-        if (esErrorApi(e) && (e.estado === 404 || e.estado === 405)) {
-        return { id: 0, nombre: correo, correo, telefono: null, rol: 'sin dato' };
-        }
-        throw e;
-    }
+// Convierte los datos del usuario que manda la API al formato de la app.
+export function usuarioDesdeApi(crudo: unknown, correoRespaldo: string): Usuario | null {
+    if (!crudo || typeof crudo !== 'object') return null;
+    const u = crudo as UsuarioApi;
+    const correo = u.email ?? u.correo ?? correoRespaldo;
+    return {
+        id: typeof u.id === 'number' ? u.id : 0,
+        nombre: u.name ?? u.nombre ?? correo,
+        correo,
+        telefono: u.telefono ?? null,
+        rol: u.rol ?? 'sin dato',
+    };
 }
 
-export async function login(correo: string, password: string): Promise<LoginResult> {
-    let token = '';
+// Si el login no trajo los datos del usuario, se piden a GET /user (con respaldo si la ruta no existe).
+export async function obtenerUsuario(token: string, correo: string): Promise<Usuario> {
+    const respaldo: Usuario = { id: 0, nombre: correo, correo, telefono: null, rol: 'sin dato' };
     try {
-        const respuesta = await llamarApi<{ token: string }>('/login', {
-        metodo: 'POST',
-        cuerpo: { email: correo, password },
-        });
-        token = respuesta.token;
+        const crudo = await llamarApi<UsuarioApi>('/user', { token });
+        return usuarioDesdeApi(crudo, correo) ?? respaldo;
     } catch (e) {
-        if (esErrorApi(e) && (e.estado === 401 || e.estado === 422)) {
-        throw new Error('Correo o contraseña incorrectos.');
-        }
+        if (esErrorApi(e) && (e.estado === 404 || e.estado === 405)) return respaldo;
         throw e;
     }
-    if (!token) throw new Error('La API no devolvió un token.');
-    return { token, usuario: await obtenerUsuario(token, correo) };
 }
 
 export async function cerrarSesionApi(token: string): Promise<void> {

@@ -3,7 +3,7 @@ import { TextInput, TextInputProps } from 'react-native';
 import { useTema } from '@/tema/ProveedorTema';
 
 export function CampoTexto({ tieneError, style, ...resto }: TextInputProps & { tieneError?: boolean }) {
-    const { colores } = useTema();
+    const { colores, escala } = useTema();
     const [enfocado, setEnfocado] = useState(false);
 
     return (
@@ -23,7 +23,7 @@ export function CampoTexto({ tieneError, style, ...resto }: TextInputProps & { t
             flex: 1,
             minHeight: 48,
             paddingHorizontal: 14,
-            fontSize: 16,
+            fontSize: 16 * escala,
             color: colores.text,
             backgroundColor: colores.inputBg,
             borderRadius: 12,

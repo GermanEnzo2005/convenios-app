@@ -8,34 +8,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Boton } from '@/componentes/atomos/Boton';
 import { Texto } from '@/componentes/atomos/Texto';
 import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla';
-import { obtenerDocumento } from '@/services/convenios.service';
+import { useSesion } from '@/contexto/ContextoSesion';
+import { esErrorApi } from '@/services/api';
 import { descargarDocumento } from '@/services/documentos.service';
 import { useTema } from '@/tema/ProveedorTema';
-import { Documento } from '@/types/convenio';
-
-type DocumentoConCodigo = Documento & { codigoConvenio: string };
 
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
 
 // Página que dibuja cada hoja del PDF en un canvas, una debajo de otra.
 function construirHtml(base64: string): string {
     return `<!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-    <style>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+<style>
     body { margin: 0; background: #525659; color: #fff; font-family: sans-serif; }
     #estado { padding: 16px; text-align: center; font-size: 15px; }
     canvas { display: block; width: 100%; height: auto; margin: 0 0 8px 0; background: #fff; }
-    </style>
-    </head>
-    <body>
-    <div id="estado">Cargando PDF…</div>
-    <div id="paginas"></div>
-    <script src="${PDFJS}/pdf.min.js"></script>
-    <script>
-    (async function () {
+</style>
+</head>
+<body>
+<div id="estado">Cargando PDF…</div>
+<div id="paginas"></div>
+<script src="${PDFJS}/pdf.min.js"></script>
+<script>
+(async function () {
     var estado = document.getElementById('estado');
     try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = '${PDFJS}/pdf.worker.min.js';
@@ -61,40 +59,44 @@ function construirHtml(base64: string): string {
     } catch (e) {
         estado.textContent = 'No se pudo mostrar el PDF. Verificá tu conexión. (' + (e && e.message ? e.message : e) + ')';
     }
-    })();
-    </script>
-    </body>
-    </html>`;
+})();
+</script>
+</body>
+</html>`;
 }
 
 export default function VisorPdf() {
     const { colores } = useTema();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { token, cerrarSesion } = useSesion();
+    const { id, titulo, codigo } = useLocalSearchParams<{ id: string; titulo?: string; codigo?: string }>();
 
-    const [documento, setDocumento] = useState<DocumentoConCodigo | null>(null);
     const [archivo, setArchivo] = useState<File | null>(null);
     const [html, setHtml] = useState<string | null>(null);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const nombre = titulo ?? 'Documento';
+
     const cargar = useCallback(async () => {
         setCargando(true);
         setError(null);
         try {
-        const d = await obtenerDocumento(Number(id));
-        const f = await descargarDocumento(d);
+        const f = await descargarDocumento(token, Number(id));
         const base64 = await f.base64();
-        setDocumento(d);
         setArchivo(f);
         setHtml(construirHtml(base64));
         } catch (e) {
+        if (esErrorApi(e) && e.estado === 401) {
+            await cerrarSesion();
+            return;
+        }
         setError(e instanceof Error ? e.message : 'No se pudo cargar el PDF.');
         } finally {
         setCargando(false);
         }
-    }, [id]);
+    }, [id, token]);
 
     useEffect(() => {
         cargar();
@@ -104,7 +106,7 @@ export default function VisorPdf() {
         if (!archivo) return;
         try {
         if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(archivo.uri, { mimeType: 'application/pdf', dialogTitle: documento?.nombre });
+            await Sharing.shareAsync(archivo.uri, { mimeType: 'application/pdf', dialogTitle: nombre });
         } else {
             Alert.alert('No disponible', 'Este dispositivo no permite compartir archivos.');
         }
@@ -117,7 +119,7 @@ export default function VisorPdf() {
         if (!archivo) return;
         try {
         if (await archivo.canPreview({ mimeType: 'application/pdf' })) {
-            await archivo.preview({ title: documento?.nombre, mimeType: 'application/pdf' });
+            await archivo.preview({ title: nombre, mimeType: 'application/pdf' });
         } else {
             Alert.alert('No hay un visor de PDF', 'Instalá una app para abrir PDF o usá «Guardar o compartir».');
         }
@@ -129,8 +131,8 @@ export default function VisorPdf() {
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
         <EncabezadoPantalla
-            titulo={documento?.nombre ?? 'Documento'}
-            subtitulo={documento ? `Convenio ${documento.codigoConvenio} · PDF` : 'Documento PDF'}
+            titulo={nombre}
+            subtitulo={codigo ? `Convenio ${codigo} · PDF` : 'Documento PDF'}
             onVolver={() => router.back()}
         />
 

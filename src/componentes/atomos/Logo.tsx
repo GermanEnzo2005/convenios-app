@@ -1,16 +1,22 @@
-import { View } from 'react-native';
-import { Texto } from './Texto';
+import { Image } from 'react-native';
 
-export function Logo() {
+type Props = { tamano?: number };
+
+// Logo de la app: un apretón de manos (acuerdo) con los colores institucionales.
+export function Logo({ tamano = 80 }: Props) {
     return (
-        <View
-        accessibilityRole="image"
-        accessibilityLabel="Logo"
-        style={{ width: 60, height: 60, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}
-        >
-        <Texto variante="etiqueta" color="#0F5A9C" style={{ fontWeight: '800' }}>
-            LOGO
-        </Texto>
-        </View>
+        <Image
+            source={require('../../../assets/images/logo.png')}
+            resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Logo del Sistema de Gestión de Convenios"
+            style={{
+                width: tamano,
+                height: tamano,
+                borderRadius: tamano * 0.22,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.15)', // separa el fondo del logo del encabezado
+            }}
+        />
     );
 }

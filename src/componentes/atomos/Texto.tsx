@@ -1,4 +1,4 @@
-import { Text, TextProps } from 'react-native';
+import { StyleSheet, Text, TextProps } from 'react-native';
 import { useTema } from '@/tema/ProveedorTema';
 
 type Variante = 'titulo' | 'subtitulo' | 'etiqueta' | 'cuerpo' | 'nota' | 'error';
@@ -15,7 +15,8 @@ const estilos = {
 type Props = TextProps & { variante?: Variante; color?: string };
 
 export function Texto({ variante = 'cuerpo', color, style, ...resto }: Props) {
-    const { colores } = useTema();
+    const { colores, escala } = useTema();
+    const base = estilos[variante];
     const colorPorDefecto =
         variante === 'error'
         ? colores.error
@@ -25,5 +26,8 @@ export function Texto({ variante = 'cuerpo', color, style, ...resto }: Props) {
             ? colores.textMuted
             : colores.text;
 
-    return <Text {...resto} style={[estilos[variante], { color: color ?? colorPorDefecto }, style]} />;
+    // El tamaño final es el de la variante (o el que venga en style) multiplicado por la escala elegida.
+    const tamano = (StyleSheet.flatten(style)?.fontSize ?? base.fontSize) * escala;
+
+    return <Text {...resto} style={[base, { color: color ?? colorPorDefecto }, style, { fontSize: tamano }]} />;
 }

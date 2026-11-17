@@ -1,7 +1,14 @@
 import { CambioEstado, Convenio, Documento, Parte } from '@/types/convenio';
-import { esErrorApi, llamarApi } from './api';
+import { llamarApi } from './api';
 
 type FirmaApi = string | boolean | number | null | undefined;
+
+type DocumentoApi = {
+    id: number;
+    archivo: string;
+    convenio_id: number;
+    created_at?: string | null;
+};
 
 type ConvenioApi = {
     id: number;
@@ -15,6 +22,8 @@ type ConvenioApi = {
     tipo_instrumento_id: number | null;
     updated_at?: string | null;
     tipo_instrumento?: { nombre?: string | null; categoria?: string | null } | null;
+    documentos?: DocumentoApi[] | null;
+    adendas?: ConvenioApi[] | null;
 };
 
 type ParteApi = {
@@ -36,7 +45,7 @@ type CambioApi = {
     usuario?: { name?: string | null } | null;
 };
 
-type Pagina<T> = { data: T[]; next_page_url: string | null };
+type Pagina<T> = { data: T[]; next_page_url: string | null; total?: number };
 
 // Coincide con la tabla tipo_instrumento. Solo se usa si la API no manda el tipo incluido.
 const TIPO_POR_ID: Record<number, string> = {
@@ -47,8 +56,9 @@ const TIPO_POR_ID: Record<number, string> = {
     5: 'Adenda',
 };
 
-// Hoy la API guarda firma_decano como texto. Cuando pase a booleano, poner esto en false.
-const FIRMA_DECANO_COMO_TEXTO = true;
+// La API ahora guarda las firmas como booleano (true/false).
+// Si volviera a ser texto, poner esto en true.
+const FIRMA_DECANO_COMO_TEXTO = false;
 
 function textoDeFirma(v: FirmaApi): string | null {
     return typeof v === 'string' && v.trim() !== '' && v !== '0' ? v : null;
@@ -63,6 +73,15 @@ function nombreDeTipo(tipo: ConvenioApi['tipo_instrumento'], id: number | null):
         return tipo.categoria && tipo.categoria !== tipo.nombre ? `${tipo.nombre} · ${tipo.categoria}` : tipo.nombre;
     }
     return (id != null ? TIPO_POR_ID[id] : undefined) ?? 'Tipo no especificado';
+}
+
+function aDocumento(d: DocumentoApi): Documento {
+    return {
+        id: d.id,
+        archivo: d.archivo,
+        convenioId: d.convenio_id,
+        creadoEn: d.created_at ? d.created_at.slice(0, 10) : null,
+    };
 }
 
 function aConvenio(r: ConvenioApi): Convenio {
@@ -80,6 +99,8 @@ function aConvenio(r: ConvenioApi): Convenio {
         firmaDecano: textoDeFirma(r.firma_decano),
         convenioPadreId: r.convenio_padre_id ?? null,
         actualizadoEn: r.updated_at ?? null,
+        documentos: (r.documentos ?? []).map(aDocumento),
+        adendas: (r.adendas ?? []).map(aConvenio),
     };
 }
 
@@ -120,24 +141,14 @@ async function pedirLista<T>(token: string | null, ruta: string, maxPaginas = 20
 }
 
 export async function obtenerConvenios(token: string | null): Promise<Convenio[]> {
-    return (await pedirLista<ConvenioApi>(token, '/convenios')).map(aConvenio);
+    return (await pedirLista<ConvenioApi>(token, '/convenios?por_pagina=50')).map(aConvenio);
 }
 
+// El detalle trae el convenio con sus documentos incluidos.
 export async function obtenerConvenio(token: string | null, id: number): Promise<Convenio> {
-    try {
-        const respuesta = await llamarApi<ConvenioApi | { data: ConvenioApi }>(`/convenios/${id}`, { token });
-        const crudo = 'data' in respuesta ? respuesta.data : respuesta;
-        return aConvenio(crudo);
-    } catch (e) {
-        // PROVISORIO: si GET /convenios/{id} falla en el servidor (500), se toma el convenio de la lista.
-        // Quitar este bloque cuando la API lo tenga arreglado.
-        if (esErrorApi(e) && e.estado >= 500) {
-        const todos = await obtenerConvenios(token);
-        const encontrado = todos.find((c) => c.id === id);
-        if (encontrado) return encontrado;
-        }
-        throw e;
-    }
+    const respuesta = await llamarApi<ConvenioApi | { data: ConvenioApi }>(`/convenios/${id}`, { token });
+    const crudo = 'data' in respuesta ? respuesta.data : respuesta;
+    return aConvenio(crudo);
 }
 
 export async function obtenerPartes(token: string | null, id: number): Promise<Parte[]> {
@@ -149,7 +160,7 @@ export async function obtenerHistorial(token: string | null, id: number): Promis
 }
 
 // Firmar = actualizar el convenio con estado "firmado" y la firma del decano.
-// Ideal a futuro: que el servidor decida quién firma según el token y registre el cambio en el historial.
+// La API exige el fundamento al cambiar de estado y valida que la transición sea válida.
 export async function firmarConvenio(token: string | null, id: number, nombreDecano: string): Promise<void> {
     await llamarApi(`/convenios/${id}`, {
         metodo: 'PATCH',
@@ -157,7 +168,7 @@ export async function firmarConvenio(token: string | null, id: number, nombreDec
         cuerpo: {
         estado: 'firmado',
         firma_decano: FIRMA_DECANO_COMO_TEXTO ? nombreDecano : true,
-        fundamento: 'Firma del decano', // la API lo exige al cambiar el estado
+        fundamento: 'Firma del decano',
         },
     });
 }
@@ -183,7 +194,56 @@ export function evaluarFirma(c: Convenio): { puede: boolean; motivo?: string } {
     return { puede: true };
 }
 
-// Pendiente: se conecta con /documentos y /documentos/{id}/download en el próximo paso.
-export async function obtenerDocumento(_id: number): Promise<Documento & { codigoConvenio: string }> {
-    throw new Error('Los documentos se conectarán con la API en el próximo paso.');
+// ---------- Búsqueda ----------
+
+export type FiltrosBusqueda = {
+    q: string;
+    estado: string | null;
+    tipoId: number | null;
+    anio: number | null; // se aplica sobre la fecha de creación
+    orden: 'fecha_creacion' | 'titulo' | 'estado' | 'codigo';
+    direccion: 'asc' | 'desc';
+};
+
+export const FILTROS_INICIALES: FiltrosBusqueda = {
+    q: '',
+    estado: null,
+    tipoId: null,
+    anio: null,
+    orden: 'fecha_creacion',
+    direccion: 'desc',
+};
+
+export const ESTADOS_FILTRO = ['borrador', 'revision', 'aprobado', 'firmado', 'rescindido', 'archivado'];
+
+export const TIPOS_INSTRUMENTO = Object.entries(TIPO_POR_ID).map(([id, nombre]) => ({ id: Number(id), nombre }));
+
+export type ResultadoBusqueda = { convenios: Convenio[]; total: number; hayMas: boolean };
+
+// Una página de resultados (la API pagina). Los filtros van siempre en la URL.
+export async function buscarConvenios(
+    token: string | null,
+    filtros: FiltrosBusqueda,
+    pagina = 1,
+    porPagina = 10,
+    ): Promise<ResultadoBusqueda> {
+    const partes: string[] = [];
+    if (filtros.q.trim()) partes.push(`q=${encodeURIComponent(filtros.q.trim())}`);
+    if (filtros.estado) partes.push(`estado=${encodeURIComponent(filtros.estado)}`);
+    if (filtros.tipoId) partes.push(`tipo_instrumento_id=${filtros.tipoId}`);
+    if (filtros.anio) {
+        partes.push(`fecha_desde=${filtros.anio}-01-01`);
+        partes.push(`fecha_hasta=${filtros.anio}-12-31`);
+    }
+    partes.push(`orden=${filtros.orden}`, `direccion=${filtros.direccion}`, `por_pagina=${porPagina}`, `page=${pagina}`);
+
+    const respuesta = await llamarApi<Pagina<ConvenioApi> | ConvenioApi[]>(`/convenios?${partes.join('&')}`, { token });
+    if (Array.isArray(respuesta)) {
+        return { convenios: respuesta.map(aConvenio), total: respuesta.length, hayMas: false };
+    }
+    return {
+        convenios: respuesta.data.map(aConvenio),
+        total: respuesta.total ?? respuesta.data.length,
+        hayMas: !!respuesta.next_page_url,
+    };
 }
