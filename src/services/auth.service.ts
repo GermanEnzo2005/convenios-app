@@ -25,12 +25,10 @@ export function usuarioDesdeApi(crudo: unknown, correoRespaldo: string): Usuario
     };
 }
 
-// Si el login no trajo los datos del usuario, se piden a GET /user (con respaldo si la ruta no existe).
 export async function obtenerUsuario(token: string, correo: string): Promise<Usuario> {
     const respaldo: Usuario = { id: 0, nombre: correo, correo, telefono: null, rol: 'sin dato' };
     try {
-        const crudo = await llamarApi<UsuarioApi>('/user', { token });
-        return usuarioDesdeApi(crudo, correo) ?? respaldo;
+        const crudo = await llamarApi<UsuarioApi>('/me', { token });        return usuarioDesdeApi(crudo, correo) ?? respaldo;
     } catch (e) {
         if (esErrorApi(e) && (e.estado === 404 || e.estado === 405)) return respaldo;
         throw e;

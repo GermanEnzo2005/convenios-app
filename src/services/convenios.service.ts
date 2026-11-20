@@ -13,7 +13,7 @@ type DocumentoApi = {
 type ConvenioApi = {
     id: number;
     fecha_creacion: string | null;
-    firma_gestor: FirmaApi;
+    fecha_vencimiento?: string | null;
     firma_decano: FirmaApi;
     titulo: string;
     estado: string;
@@ -22,6 +22,8 @@ type ConvenioApi = {
     tipo_instrumento_id: number | null;
     updated_at?: string | null;
     tipo_instrumento?: { nombre?: string | null; categoria?: string | null } | null;
+    unidad?: { nombre?: string | null } | null;
+    revisor?: { name?: string | null } | null;
     documentos?: DocumentoApi[] | null;
     adendas?: ConvenioApi[] | null;
 };
@@ -30,6 +32,8 @@ type ParteApi = {
     id: number;
     representante?: {
         nombre?: string | null;
+        apellido?: string | null;
+        cargo?: string | null;
         email?: string | null;
         telefono?: string | null;
         unidad_responsable?: { nombre?: string | null; tipo?: string | null } | null;
@@ -47,7 +51,7 @@ type CambioApi = {
 
 type Pagina<T> = { data: T[]; next_page_url: string | null; total?: number };
 
-// Coincide con la tabla tipo_instrumento. Solo se usa si la API no manda el tipo incluido.
+// Coincide con la tabla tipo_instrumentos. Solo se usa si la API no manda el tipo incluido.
 const TIPO_POR_ID: Record<number, string> = {
     1: 'Convenio marco · Colaboración',
     2: 'Convenio específico · Colaboración',
@@ -56,14 +60,7 @@ const TIPO_POR_ID: Record<number, string> = {
     5: 'Adenda',
 };
 
-// La API ahora guarda las firmas como booleano (true/false).
-// Si volviera a ser texto, poner esto en true.
-const FIRMA_DECANO_COMO_TEXTO = false;
-
-function textoDeFirma(v: FirmaApi): string | null {
-    return typeof v === 'string' && v.trim() !== '' && v !== '0' ? v : null;
-}
-
+// La API registra solo si el decano firmó (booleano); puede llegar como true/false o 1/0.
 function hayFirma(v: FirmaApi): boolean {
     return v === true || v === 1 || (typeof v === 'string' && v.trim() !== '' && v !== '0');
 }
@@ -92,11 +89,11 @@ function aConvenio(r: ConvenioApi): Convenio {
         estado: r.estado,
         tipoId: r.tipo_instrumento_id ?? null,
         tipoNombre: nombreDeTipo(r.tipo_instrumento, r.tipo_instrumento_id ?? null),
+        unidadNombre: r.unidad?.nombre ?? null,
+        revisorNombre: r.revisor?.name ?? null,
         fechaCreacion: r.fecha_creacion ? r.fecha_creacion.slice(0, 10) : null,
-        firmadoPorGestor: hayFirma(r.firma_gestor),
-        firmaGestor: textoDeFirma(r.firma_gestor),
+        fechaVencimiento: r.fecha_vencimiento ? r.fecha_vencimiento.slice(0, 10) : null,
         firmadoPorDecano: hayFirma(r.firma_decano),
-        firmaDecano: textoDeFirma(r.firma_decano),
         convenioPadreId: r.convenio_padre_id ?? null,
         actualizadoEn: r.updated_at ?? null,
         documentos: (r.documentos ?? []).map(aDocumento),
@@ -106,11 +103,13 @@ function aConvenio(r: ConvenioApi): Convenio {
 
 function aParte(p: ParteApi): Parte {
     const r = p.representante;
+    const nombre = [r?.nombre, r?.apellido].filter(Boolean).join(' ');
     return {
         id: p.id,
         unidad: r?.unidad_responsable?.nombre ?? 'Sin unidad',
         tipoUnidad: r?.unidad_responsable?.tipo ?? '',
-        representante: r?.nombre ?? 'Sin representante',
+        representante: nombre || 'Sin representante',
+        cargo: r?.cargo ?? '',
         email: r?.email ?? '',
         telefono: r?.telefono ?? null,
     };
@@ -144,7 +143,7 @@ export async function obtenerConvenios(token: string | null): Promise<Convenio[]
     return (await pedirLista<ConvenioApi>(token, '/convenios?por_pagina=50')).map(aConvenio);
 }
 
-// El detalle trae el convenio con sus documentos incluidos.
+// El detalle trae el convenio con sus documentos y adendas incluidos.
 export async function obtenerConvenio(token: string | null, id: number): Promise<Convenio> {
     const respuesta = await llamarApi<ConvenioApi | { data: ConvenioApi }>(`/convenios/${id}`, { token });
     const crudo = 'data' in respuesta ? respuesta.data : respuesta;
@@ -159,17 +158,13 @@ export async function obtenerHistorial(token: string | null, id: number): Promis
     return (await pedirLista<CambioApi>(token, `/convenios/${id}/historial`, 5)).map(aCambio);
 }
 
-// Firmar = actualizar el convenio con estado "firmado" y la firma del decano.
-// La API exige el fundamento al cambiar de estado y valida que la transición sea válida.
-export async function firmarConvenio(token: string | null, id: number, nombreDecano: string): Promise<void> {
+// Firmar = actualizar el convenio con estado "firmado" y firma_decano en true.
+// La API valida la transición (aprobado a firmado) y exige el fundamento (máximo 45 caracteres).
+export async function firmarConvenio(token: string | null, id: number): Promise<void> {
     await llamarApi(`/convenios/${id}`, {
         metodo: 'PATCH',
         token,
-        cuerpo: {
-        estado: 'firmado',
-        firma_decano: FIRMA_DECANO_COMO_TEXTO ? nombreDecano : true,
-        fundamento: 'Firma del decano',
-        },
+        cuerpo: { estado: 'firmado', firma_decano: true, fundamento: 'Firma del decano' },
     });
 }
 
@@ -220,7 +215,7 @@ export const TIPOS_INSTRUMENTO = Object.entries(TIPO_POR_ID).map(([id, nombre]) 
 
 export type ResultadoBusqueda = { convenios: Convenio[]; total: number; hayMas: boolean };
 
-// Una página de resultados (la API pagina). Los filtros van siempre en la URL.
+
 export async function buscarConvenios(
     token: string | null,
     filtros: FiltrosBusqueda,

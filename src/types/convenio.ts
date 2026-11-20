@@ -2,30 +2,27 @@ import { Tono } from '@/tema/colores';
 
 export type Documento = {
     id: number;
-    archivo: string; // nombre interno que genera el servidor: no es legible para el usuario
+    archivo: string; 
     convenioId: number;
     creadoEn: string | null; // 'YYYY-MM-DD'
-    
 };
-
-
 
 export type Convenio = {
     id: number;
     codigo: string;
     titulo: string;
-    estado: string; // borrador, revision, aprobado, firmado...
+    estado: string; // borrador, revision, aprobado, firmado, rescindido, archivado
     tipoId: number | null;
     tipoNombre: string;
+    unidadNombre: string | null; // unidad responsable
+    revisorNombre: string | null; // revisor asignado
     fechaCreacion: string | null; // 'YYYY-MM-DD'
-    firmadoPorGestor: boolean;
-    firmaGestor: string | null; // nombre, si la API lo manda como texto
-    firmadoPorDecano: boolean;
-    firmaDecano: string | null; // nombre, si la API lo manda como texto
+    fechaVencimiento: string | null; // null = sin vencimiento registrado
+    firmadoPorDecano: boolean; // la API solo registra si se firmó
     convenioPadreId: number | null;
     actualizadoEn: string | null;
-    documentos: Documento[]; // viene en el detalle; en el listado queda vacío
-    adendas: Convenio[]; // convenios hijos (adendas); vienen en el detalle
+    documentos: Documento[]; 
+    adendas: Convenio[]; // convenios hijos; vienen en el detalle
 };
 
 export type Parte = {
@@ -33,6 +30,7 @@ export type Parte = {
     unidad: string;
     tipoUnidad: string;
     representante: string;
+    cargo: string;
     email: string;
     telefono: string | null;
 };

@@ -18,12 +18,12 @@ import {
 } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { CambioEstado, Convenio, etiquetaEstado, Parte, tonoEstado } from '@/types/convenio';
-import { formatearFecha } from '@/utils/fechas';
+import { estadoVencimiento, formatearFecha } from '@/utils/fechas';
 
 export default function DetalleConvenio() {
     const { colores } = useTema();
     const router = useRouter();
-    const { token, usuario, cerrarSesion } = useSesion();
+    const { token, cerrarSesion } = useSesion();
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const [convenio, setConvenio] = useState<Convenio | null>(null);
@@ -77,9 +77,8 @@ export default function DetalleConvenio() {
         if (!convenio) return;
         setFirmando(true);
         try {
-        const nombre = usuario?.nombre ?? 'Decano';
-        await firmarConvenio(token, convenio.id, nombre);
-        setConvenio({ ...convenio, estado: 'firmado', firmadoPorDecano: true, firmaDecano: nombre });
+        await firmarConvenio(token, convenio.id);
+        setConvenio({ ...convenio, estado: 'firmado', firmadoPorDecano: true });
         Alert.alert(
             'Convenio firmado',
             `${convenio.codigo} quedó firmado.`,
@@ -110,6 +109,7 @@ export default function DetalleConvenio() {
     };
 
     const firma = convenio ? evaluarFirma(convenio) : null;
+    const vencimiento = convenio?.fechaVencimiento ? estadoVencimiento(convenio.fechaVencimiento) : null;
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
@@ -137,8 +137,48 @@ export default function DetalleConvenio() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 <Insignia texto={etiquetaEstado(convenio.estado)} tono={tonoEstado(convenio.estado)} />
                 <Insignia texto={convenio.tipoNombre} tono="info" />
+                {vencimiento ? <Insignia texto={vencimiento.texto} tono={vencimiento.tono} /> : null}
                 </View>
             </View>
+
+            <SeccionDetalle titulo="Datos generales">
+                <FilaDato etiqueta="Código" valor={convenio.codigo} />
+                <FilaDato etiqueta="Tipo de instrumento" valor={convenio.tipoNombre} />
+                {convenio.unidadNombre ? <FilaDato etiqueta="Unidad responsable" valor={convenio.unidadNombre} /> : null}
+                <FilaDato
+                etiqueta="Fecha de creación"
+                valor={convenio.fechaCreacion ? formatearFecha(convenio.fechaCreacion) : 'Sin fecha'}
+                />
+                <FilaDato
+                etiqueta="Vencimiento"
+                valor={convenio.fechaVencimiento ? formatearFecha(convenio.fechaVencimiento) : 'Sin vencimiento registrado'}
+                />
+                {convenio.revisorNombre ? <FilaDato etiqueta="Revisor" valor={convenio.revisorNombre} /> : null}
+                {convenio.convenioPadreId ? (
+                <FilaDato etiqueta="Convenio de origen" valor={`Convenio N.º ${convenio.convenioPadreId}`} />
+                ) : null}
+            </SeccionDetalle>
+
+            <SeccionDetalle titulo="Partes y representantes">
+                {partes === null ? (
+                <Texto variante="subtitulo">No se pudieron cargar las partes.</Texto>
+                ) : partes.length === 0 ? (
+                <Texto variante="subtitulo">Este convenio todavía no tiene partes registradas.</Texto>
+                ) : (
+                partes.map((p) => (
+                    <View key={p.id} style={{ gap: 2 }}>
+                    <Texto variante="etiqueta">{p.unidad}</Texto>
+                    {p.tipoUnidad ? <Texto variante="nota">{p.tipoUnidad}</Texto> : null}
+                    <Texto variante="subtitulo">
+                        {p.representante}
+                        {p.cargo ? ` (${p.cargo})` : ''}
+                    </Texto>
+                    {p.email ? <Texto variante="subtitulo">{p.email}</Texto> : null}
+                    {p.telefono ? <Texto variante="subtitulo">{p.telefono}</Texto> : null}
+                    </View>
+                ))
+                )}
+            </SeccionDetalle>
 
             <SeccionDetalle titulo="Documentos">
                 {convenio.documentos.length === 0 ? (
@@ -169,35 +209,8 @@ export default function DetalleConvenio() {
                 )}
             </SeccionDetalle>
 
-            <SeccionDetalle titulo="Partes y representantes">
-                {partes === null ? (
-                <Texto variante="subtitulo">No se pudieron cargar las partes.</Texto>
-                ) : partes.length === 0 ? (
-                <Texto variante="subtitulo">Este convenio todavía no tiene partes registradas.</Texto>
-                ) : (
-                partes.map((p) => (
-                    <View key={p.id} style={{ gap: 2 }}>
-                    <Texto variante="etiqueta">{p.unidad}</Texto>
-                    {p.tipoUnidad ? <Texto variante="nota">{p.tipoUnidad}</Texto> : null}
-                    <Texto variante="subtitulo">
-                        {p.representante}
-                        {p.email ? ` · ${p.email}` : ''}
-                    </Texto>
-                    {p.telefono ? <Texto variante="subtitulo">{p.telefono}</Texto> : null}
-                    </View>
-                ))
-                )}
-            </SeccionDetalle>
-
-            <SeccionDetalle titulo="Firmas">
-                <FilaDato
-                etiqueta="Gestor"
-                valor={convenio.firmadoPorGestor ? (convenio.firmaGestor ?? 'Firmado') : 'Pendiente'}
-                />
-                <FilaDato
-                etiqueta="Decano"
-                valor={convenio.firmadoPorDecano ? (convenio.firmaDecano ?? 'Firmado') : 'Pendiente'}
-                />
+            <SeccionDetalle titulo="Firma del decano">
+                <FilaDato etiqueta="Estado de la firma" valor={convenio.firmadoPorDecano ? 'Registrada' : 'Pendiente'} />
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Historial de estados">
