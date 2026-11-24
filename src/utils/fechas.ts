@@ -21,7 +21,12 @@ export function formatearFecha(iso: string): string {
     const [anio, mes, dia] = iso.split('-');
     return `${dia}/${mes}/${anio}`;
 }
-
+// Para timestamps de la API (ISO en UTC): se muestran en la hora del celular
+export function formatearFechaHora(iso: string): string {
+    const d = new Date(iso);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 export function estadoVencimiento(iso: string | null): { texto: string; tono: Tono } {
     if (!iso) return { texto: 'Sin vencimiento registrado', tono: 'neutro' };
     const d = diasHasta(iso);

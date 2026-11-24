@@ -1,6 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Boton } from '@/componentes/atomos/Boton';
 import { Texto } from '@/componentes/atomos/Texto';
 import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla';
@@ -11,19 +8,31 @@ import { useSesion } from '@/contexto/ContextoSesion';
 import { esErrorApi } from '@/services/api';
 import {
     evaluarFirma,
-    firmarConvenio,
     obtenerConvenio,
     obtenerHistorial,
-    obtenerPartes,
+    obtenerPartes
 } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { CambioEstado, Convenio, etiquetaEstado, Parte, tonoEstado } from '@/types/convenio';
 import { estadoVencimiento, formatearFecha } from '@/utils/fechas';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+
+import { useFocusEffect } from 'expo-router';
+
+
+import { AvisoSinConexion } from '@/componentes/compartidos/AvisoSinConexion';
+import { useConexion } from '@/hooks/useConexion';
+import { pendienteGuardado } from '@/services/pendientes.service';
 
 export default function DetalleConvenio() {
     const { colores } = useTema();
     const router = useRouter();
-    const { token, cerrarSesion } = useSesion();
+    const { token, usuario, cerrarSesion } = useSesion();
+    const enLinea = useConexion();
+    const [desdeCache, setDesdeCache] = useState(false);
+    const sinInternet = !enLinea || desdeCache;
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const [convenio, setConvenio] = useState<Convenio | null>(null);
@@ -52,7 +61,22 @@ export default function DetalleConvenio() {
             return;
         }
 
-        if (rConvenio.status === 'rejected') throw rConvenio.reason;
+        if (rConvenio.status === 'rejected') {
+            if (esErrorApi(rConvenio.reason) && rConvenio.reason.estado === 0) {
+                const guardado = await pendienteGuardado(usuario?.id ?? 0, numero);
+                if (guardado) {
+                    setConvenio(guardado);
+                    setPartes(null);
+                    setHistorial(null);
+                    setRegistroFirma(null);
+                    setFirmaUri(null);
+                    setDesdeCache(true);
+                    return;
+                }
+            }
+            throw rConvenio.reason;
+        }
+        setDesdeCache(false);
         setConvenio(rConvenio.value);
         setPartes(rPartes.status === 'fulfilled' ? rPartes.value : null);
         setHistorial(rHistorial.status === 'fulfilled' ? rHistorial.value : null);
@@ -69,44 +93,11 @@ export default function DetalleConvenio() {
         }
     }, [id, token]);
 
-    useEffect(() => {
-        cargar();
-    }, [cargar]);
-
-    const firmar = async () => {
-        if (!convenio) return;
-        setFirmando(true);
-        try {
-        await firmarConvenio(token, convenio.id);
-        setConvenio({ ...convenio, estado: 'firmado', firmadoPorDecano: true });
-        Alert.alert(
-            'Convenio firmado',
-            `${convenio.codigo} quedó firmado.`,
-            [{ text: 'Aceptar', onPress: () => router.back() }],
-            { cancelable: false },
-        );
-        } catch (e) {
-        if (esErrorApi(e) && e.estado === 401) {
-            await cerrarSesion();
-            return;
-        }
-        Alert.alert('No se pudo firmar', e instanceof Error ? e.message : 'Error desconocido');
-        } finally {
-        setFirmando(false);
-        }
-    };
-
-    const confirmarFirma = () => {
-        if (!convenio) return;
-        Alert.alert(
-        'Firmar convenio',
-        `Se registrará tu firma en ${convenio.codigo} y su estado pasará a Firmado. ¿Confirmás?`,
-        [
-            { text: 'Cancelar', style: 'cancel' },
-            { text: 'Firmar', onPress: firmar },
-        ],
-        );
-    };
+    useFocusEffect(
+        useCallback(() => {
+            cargar();
+        }, [cargar, enLinea]),
+    );
 
     const firma = convenio ? evaluarFirma(convenio) : null;
     const vencimiento = convenio?.fechaVencimiento ? estadoVencimiento(convenio.fechaVencimiento) : null;
@@ -130,6 +121,9 @@ export default function DetalleConvenio() {
             </View>
         ) : (
             <ScrollView contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 40 }}>
+            {sinInternet ? (
+                <AvisoSinConexion mensaje="Sin internet no se puede firmar ni abrir documentos, y los datos pueden estar desactualizados." />
+            ) : null}
             <View style={{ gap: 10 }}>
                 <Texto variante="titulo" style={{ fontSize: 22 }}>
                 {convenio.titulo}
@@ -196,12 +190,13 @@ export default function DetalleConvenio() {
                         titulo="Ver PDF"
                         variante="contorno"
                         tamano="chico"
-                        onPress={() =>
-                        router.push({
-                            pathname: '/documento/[id]',
-                            params: { id: String(d.id), titulo: `Documento ${i + 1}`, codigo: convenio.codigo },
-                        })
-                        }
+                        onPress={() => {
+                            if (sinInternet) {
+                                Alert.alert('Sin conexión', 'Los documentos solo se pueden ver con internet.');
+                                return;
+                            }
+                            router.push({ pathname: '/documento/[id]', params: { id: String(d.id), titulo: `Documento ${i + 1}`, codigo: convenio.codigo } });
+                        }}
                         accessibilityLabel={`Ver PDF del documento ${i + 1}`}
                     />
                     </View>
@@ -235,12 +230,27 @@ export default function DetalleConvenio() {
             </SeccionDetalle>
 
             {firma?.puede ? (
-                <Boton titulo="Firmar convenio" onPress={confirmarFirma} cargando={firmando} />
+                sinInternet ? (
+                    <AvisoSinConexion mensaje="Para firmar este convenio necesitás conexión a internet." />
+                ) : (
+                    <Boton titulo="Firmar convenio" onPress={() => router.push({ pathname: '/firmar/[id]', params: { id: String(convenio.id), codigo: convenio.codigo } })} />
+                )
             ) : (
                 <View style={{ backgroundColor: colores.surface, borderRadius: 14, borderWidth: 1, borderColor: colores.border, padding: 14 }}>
                 <Texto variante="subtitulo">{firma?.motivo}</Texto>
                 </View>
             )}
+
+            <Boton
+                titulo="Comentarios"
+                variante="contorno"
+                onPress={() =>
+                    router.push({
+                        pathname: '/comentarios/[id]',
+                        params: { id: String(convenio.id), codigo: convenio.codigo },
+                    })
+                }
+            />
             </ScrollView>
         )}
         </View>
