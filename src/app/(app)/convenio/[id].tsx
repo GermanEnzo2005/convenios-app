@@ -9,18 +9,21 @@ import { esErrorApi } from '@/services/api';
 import {
     evaluarFirma,
     obtenerConvenio,
+    obtenerFirma,
     obtenerHistorial,
-    obtenerPartes
+    obtenerPartes,
+    RegistroFirma,
 } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { CambioEstado, Convenio, etiquetaEstado, Parte, tonoEstado } from '@/types/convenio';
-import { estadoVencimiento, formatearFecha } from '@/utils/fechas';
+import { estadoVencimiento, formatearFecha, formatearFechaHora } from '@/utils/fechas';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, ScrollView, View } from 'react-native';
 
 import { useFocusEffect } from 'expo-router';
 
+import { descargarFirma } from '@/services/documentos.service';
 
 import { AvisoSinConexion } from '@/componentes/compartidos/AvisoSinConexion';
 import { useConexion } from '@/hooks/useConexion';
@@ -41,6 +44,8 @@ export default function DetalleConvenio() {
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [firmando, setFirmando] = useState(false);
+    const [registroFirma, setRegistroFirma] = useState<RegistroFirma | null>(null);
+    const [firmaUri, setFirmaUri] = useState<string | null>(null);
 
     const cargar = useCallback(async () => {
         setCargando(true);
@@ -80,6 +85,19 @@ export default function DetalleConvenio() {
         setConvenio(rConvenio.value);
         setPartes(rPartes.status === 'fulfilled' ? rPartes.value : null);
         setHistorial(rHistorial.status === 'fulfilled' ? rHistorial.value : null);
+        if (rConvenio.value.estado === 'firmado') {
+            try {
+                const reg = await obtenerFirma(token, numero);
+                setRegistroFirma(reg);
+                setFirmaUri(reg ? await descargarFirma(token, reg.id) : null);
+            } catch {
+                setRegistroFirma(null);
+                setFirmaUri(null);
+            }
+        } else {
+            setRegistroFirma(null);
+            setFirmaUri(null);
+        }
         } catch (e) {
         setError(
             esErrorApi(e) && e.estado === 404
@@ -206,6 +224,39 @@ export default function DetalleConvenio() {
 
             <SeccionDetalle titulo="Firma del decano">
                 <FilaDato etiqueta="Estado de la firma" valor={convenio.firmadoPorDecano ? 'Registrada' : 'Pendiente'} />
+                {registroFirma ? (
+                    <>
+                        <FilaDato etiqueta="Firmado por" valor={registroFirma.firmante} />
+                        <FilaDato etiqueta="Fecha y hora" valor={formatearFechaHora(registroFirma.fecha)} />
+                        <FilaDato
+                            etiqueta="Ubicación"
+                            valor={`${registroFirma.latitud.toFixed(5)}, ${registroFirma.longitud.toFixed(5)}`}
+                        />
+                       {firmaUri ? (
+                        <Image
+                            source={{ uri: firmaUri }}
+                            style={{
+                                width: '100%',
+                                height: 140,
+                                backgroundColor: '#fff',
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                borderColor: colores.border,
+                            }}
+                            resizeMode="contain"
+                            accessibilityLabel="Firma manuscrita del decano"
+                        />
+                    ) : null}
+                        <Boton
+                            titulo="Ver ubicación en el mapa"
+                            variante="contorno"
+                            tamano="chico"
+                            onPress={() =>
+                                Linking.openURL(`https://www.google.com/maps?q=${registroFirma.latitud},${registroFirma.longitud}`)
+                            }
+                        />
+                    </>
+                ) : null}
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Historial de estados">

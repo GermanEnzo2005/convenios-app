@@ -1,5 +1,5 @@
-import { fetch } from 'expo/fetch';
 import { File, Paths } from 'expo-file-system';
+import { fetch } from 'expo/fetch';
 import { ErrorApi, esErrorApi, URL_BASE } from './api';
 
 function errorDescarga(mensaje: string, estado: number): ErrorApi {
@@ -36,5 +36,29 @@ export async function descargarDocumento(token: string | null, documentoId: numb
     } catch (e) {
         if (esErrorApi(e)) throw e;
         throw errorDescarga('No se pudo descargar el documento. Verificá tu conexión.', 0);
+    }
+}
+
+export async function descargarFirma(token: string | null, firmaId: number): Promise<string> {
+    try {
+        const respuesta = await fetch(`${URL_BASE}/firmas/${firmaId}/imagen`, {
+            headers: {
+                Accept: 'image/png',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!respuesta.ok) {
+            throw errorDescarga(`No se pudo descargar la firma (código ${respuesta.status}).`, respuesta.status);
+        }
+
+        const archivo = new File(Paths.cache, `firma-${firmaId}.png`);
+        if (archivo.exists) archivo.delete();
+        archivo.create();
+        archivo.write(await respuesta.bytes());
+        return archivo.uri;
+    } catch (e) {
+        if (esErrorApi(e)) throw e;
+        throw errorDescarga('No se pudo descargar la firma. Verificá tu conexión.', 0);
     }
 }

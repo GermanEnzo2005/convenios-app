@@ -1,5 +1,5 @@
 import { CambioEstado, Convenio, Documento, Parte } from '@/types/convenio';
-import { llamarApi } from './api';
+import { esErrorApi, llamarApi, URL_BASE } from './api';
 
 type FirmaApi = string | boolean | number | null | undefined;
 
@@ -26,6 +26,25 @@ type ConvenioApi = {
     revisor?: { name?: string | null } | null;
     documentos?: DocumentoApi[] | null;
     adendas?: ConvenioApi[] | null;
+};
+
+export type RegistroFirma = {
+    id: number;
+    fecha: string; // ISO, en UTC
+    latitud: number;
+    longitud: number;
+    firmante: string;
+    imagenUrl: string;
+};
+
+export type PayloadFirma = { firma: string; latitud: number; longitud: number };
+
+type RegistroFirmaApi = {
+    id: number;
+    fecha_firma: string;
+    latitud: number | string;
+    longitud: number | string;
+    usuario?: { name?: string | null } | null;
 };
 
 type ParteApi = {
@@ -63,6 +82,23 @@ const TIPO_POR_ID: Record<number, string> = {
 // La API registra solo si el decano firmó (booleano); puede llegar como true/false o 1/0.
 function hayFirma(v: FirmaApi): boolean {
     return v === true || v === 1 || (typeof v === 'string' && v.trim() !== '' && v !== '0');
+}
+
+export async function obtenerFirma(token: string | null, convenioId: number): Promise<RegistroFirma | null> {
+    try {
+        const f = await llamarApi<RegistroFirmaApi>(`/convenios/${convenioId}/firma`, { token });
+        return {
+            id: f.id,
+            fecha: f.fecha_firma,
+            latitud: Number(f.latitud),
+            longitud: Number(f.longitud),
+            firmante: f.usuario?.name ?? 'Sin dato',
+            imagenUrl: `${URL_BASE}/firmas/${f.id}/imagen`,
+        };
+    } catch (e) {
+        if (esErrorApi(e) && e.estado === 404) return null;
+        throw e;
+    }
 }
 
 function nombreDeTipo(tipo: ConvenioApi['tipo_instrumento'], id: number | null): string {
@@ -160,11 +196,11 @@ export async function obtenerHistorial(token: string | null, id: number): Promis
 
 // Firmar = actualizar el convenio con estado "firmado" y firma_decano en true.
 // La API valida la transición (aprobado a firmado) y exige el fundamento (máximo 45 caracteres).
-export async function firmarConvenio(token: string | null, id: number): Promise<void> {
-    await llamarApi(`/convenios/${id}`, {
-        metodo: 'PATCH',
+export async function firmarConvenio(token: string | null, id: number, payload: PayloadFirma): Promise<void> {
+    await llamarApi(`/convenios/${id}/firma`, {
+        metodo: 'POST',
         token,
-        cuerpo: { estado: 'firmado', firma_decano: true, fundamento: 'Firma del decano' },
+        cuerpo: payload,
     });
 }
 
