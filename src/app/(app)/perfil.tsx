@@ -47,7 +47,7 @@ export default function Perfil() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
-        <EncabezadoPantalla titulo="Perfil y ajustes" onVolver={() => router.back()} />
+        <EncabezadoPantalla titulo="Perfil y ajustes" onVolver={() => router.back()} ayuda="perfil" />
 
         <ScrollView contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 40 }}>
             <View style={{ alignItems: 'center', gap: 8 }}>
@@ -110,6 +110,13 @@ export default function Perfil() {
                 ))}
             </View>
             <Texto>Así se ve el texto de la app con este tamaño.</Texto>
+            </SeccionDetalle>
+
+            <SeccionDetalle titulo="Ayuda">
+                <Boton titulo="Manual de usuario" variante="contorno" onPress={() => router.push('/ayuda')} />
+                <Texto variante="nota">
+                    Guías paso a paso para registrar tu identidad y firmar un convenio.
+                </Texto>
             </SeccionDetalle>
 
             <Boton titulo="Cerrar sesión" variante="contorno" onPress={cerrarSesion} />

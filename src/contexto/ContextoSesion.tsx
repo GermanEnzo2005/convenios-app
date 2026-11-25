@@ -1,7 +1,8 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { cerrarSesionApi, obtenerUsuario, usuarioDesdeApi } from '@/services/auth.service';
+import { limpiarCacheOffline } from '@/services/cacheOffline.service';
 import { Usuario } from '@/types/usuario';
+import * as SecureStore from 'expo-secure-store';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 const CLAVE_TOKEN = 'sesion_token';
 const CLAVE_USUARIO = 'sesion_usuario';
@@ -19,6 +20,7 @@ const ContextoSesion = createContext<Sesion | null>(null);
 async function borrarSesionGuardada() {
     await SecureStore.deleteItemAsync(CLAVE_TOKEN).catch(() => {});
     await SecureStore.deleteItemAsync(CLAVE_USUARIO).catch(() => {});
+    await limpiarCacheOffline();
 }
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
