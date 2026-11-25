@@ -10,17 +10,16 @@ import { FilaConvenioFirmado } from '@/componentes/inicio/FilaConvenioFirmado';
 import { TarjetaConvenio } from '@/componentes/inicio/TarjetaConvenio';
 import { usePerfil } from '@/contexto/ContextoPerfil';
 import { useSesion } from '@/contexto/ContextoSesion';
-import { useConexion } from '@/utils/useConexion';
 import { esErrorApi } from '@/services/api';
 import { ultimosFirmados } from '@/services/convenios.service';
 import { cargarConvenios } from '@/services/pendientes.service';
-import { revisarNotificacionesAhora } from '@/services/segundoPlano.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { Convenio } from '@/types/convenio';
 import { formatearFechaHora } from '@/utils/fechas';
+import { useConexion } from '@/utils/useConexion';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Button, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
 
 export default function Inicio() {
     const { colores } = useTema();
@@ -79,9 +78,6 @@ export default function Inicio() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
-        <View style={{ position: 'absolute', bottom: 24, right: 16, zIndex: 10 }}>
-            <Button title="PROBAR AVISO" onPress={() => revisarNotificacionesAhora()} />    
-        </View>
             <EncabezadoPantalla
                 titulo={`Hola, ${usuario?.nombre ?? 'decano'}`}
                 subtitulo="Decanato · Facultad de Ingeniería"
