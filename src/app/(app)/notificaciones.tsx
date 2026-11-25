@@ -42,6 +42,7 @@ export default function Notificaciones() {
             titulo="Notificaciones"
             subtitulo={noLeidas > 0 ? `${noLeidas} sin leer` : 'Estás al día'}
             onVolver={() => router.back()}
+            ayuda="notificaciones"
         />
 
         <ScrollView

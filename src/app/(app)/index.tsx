@@ -10,7 +10,7 @@ import { FilaConvenioFirmado } from '@/componentes/inicio/FilaConvenioFirmado';
 import { TarjetaConvenio } from '@/componentes/inicio/TarjetaConvenio';
 import { usePerfil } from '@/contexto/ContextoPerfil';
 import { useSesion } from '@/contexto/ContextoSesion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 import { esErrorApi } from '@/services/api';
 import { ultimosFirmados } from '@/services/convenios.service';
 import { cargarConvenios } from '@/services/pendientes.service';
@@ -86,6 +86,7 @@ export default function Inicio() {
                     etiqueta: 'Perfil y ajustes',
                     onPress: () => router.push('/perfil'),
                 }}
+                ayuda="inicio"
             >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={{ flex: 1 }}>

@@ -26,7 +26,7 @@ import { useFocusEffect } from 'expo-router';
 import { descargarFirma } from '@/services/documentos.service';
 
 import { AvisoSinConexion } from '@/componentes/compartidos/AvisoSinConexion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 import { pendienteGuardado } from '@/services/pendientes.service';
 
 export default function DetalleConvenio() {
@@ -122,7 +122,7 @@ export default function DetalleConvenio() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
-        <EncabezadoPantalla titulo={convenio?.codigo ?? 'Convenio'} subtitulo="Detalle del convenio" onVolver={() => router.back()} />
+        <EncabezadoPantalla titulo={convenio?.codigo ?? 'Convenio'} subtitulo="Detalle del convenio" onVolver={() => router.back()} ayuda="convenio" />
 
         {cargando ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

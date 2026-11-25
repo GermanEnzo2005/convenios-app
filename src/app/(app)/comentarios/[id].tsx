@@ -3,7 +3,7 @@ import { Texto } from '@/componentes/atomos/Texto';
 import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla';
 import { PantallaSinConexion } from '@/componentes/compartidos/PantallaSinConexion';
 import { useSesion } from '@/contexto/ContextoSesion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 import { esErrorApi } from '@/services/api';
 import { Comentario, crearComentario, obtenerComentarios } from '@/services/comentarios.service';
 import { useTema } from '@/tema/ProveedorTema';
@@ -75,7 +75,7 @@ export default function Comentarios() {
     if (!enLinea) {
         return (
             <PantallaSinConexion titulo="Comentarios" subtitulo={codigo}
-                mensaje="Sin internet no podés ver ni escribir comentarios." onVolver={() => router.back()} />
+                mensaje="Sin internet no podés ver ni escribir comentarios." onVolver={() => router.back()} ayuda="comentarios" />
         );
     }
 
@@ -84,7 +84,7 @@ export default function Comentarios() {
             style={{ flex: 1, backgroundColor: colores.background }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <EncabezadoPantalla titulo="Comentarios" subtitulo={codigo} onVolver={() => router.back()} />
+            <EncabezadoPantalla titulo="Comentarios" subtitulo={codigo} onVolver={() => router.back()} ayuda="comentarios" />
 
             {cargando ? (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

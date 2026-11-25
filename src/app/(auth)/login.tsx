@@ -2,7 +2,7 @@ import { AvisoSinConexion } from '@/componentes/compartidos/AvisoSinConexion';
 import { EncabezadoLogin } from '@/componentes/organismos/EncabezadoLogin';
 import { FormularioLogin } from '@/componentes/organismos/FormularioLogin';
 import { useSesion } from '@/contexto/ContextoSesion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 import { iniciarVerificacion } from '@/services/verificacion.service';
 import { useTema } from '@/tema/ProveedorTema';
 import { Redirect, useRouter } from 'expo-router';

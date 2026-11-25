@@ -13,7 +13,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 import SignatureScreen, { SignatureViewRef } from 'react-native-signature-canvas';
 
 import { PantallaSinConexion } from '@/componentes/compartidos/PantallaSinConexion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 
 type Paso = 'huella' | 'firma' | 'enviando';
 
@@ -74,13 +74,13 @@ export default function FirmarConvenio() {
   if (!enLinea && paso === 'huella') {
     return (
         <PantallaSinConexion titulo="Firmar convenio" subtitulo={codigo}
-            mensaje="Para firmar un convenio necesitás conexión a internet." onVolver={() => router.back()} />
+            mensaje="Para firmar un convenio necesitás conexión a internet." onVolver={() => router.back()} ayuda="firmar" />
     );
 }
 
   return (
     <View style={{ flex: 1, backgroundColor: colores.background }}>
-      <EncabezadoPantalla titulo="Firmar convenio" subtitulo={codigo} onVolver={() => router.back()} />
+      <EncabezadoPantalla titulo="Firmar convenio" subtitulo={codigo} onVolver={() => router.back()} ayuda="firmar" />
       {paso === 'huella' && (
         <View style={{ padding: 16, gap: 12 }}>
           {error ? (

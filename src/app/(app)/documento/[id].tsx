@@ -134,6 +134,7 @@ export default function VisorPdf() {
             titulo={nombre}
             subtitulo={codigo ? `Convenio ${codigo} · PDF` : 'Documento PDF'}
             onVolver={() => router.back()}
+            ayuda="documento"
         />
 
         {cargando ? (

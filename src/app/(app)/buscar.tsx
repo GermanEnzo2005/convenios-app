@@ -7,7 +7,7 @@ import { AvisoSinConexion } from '@/componentes/compartidos/AvisoSinConexion';
 import { CampoBusqueda } from '@/componentes/compartidos/CampoBusqueda';
 import { EncabezadoPantalla } from '@/componentes/compartidos/EncabezadoPantalla';
 import { useSesion } from '@/contexto/ContextoSesion';
-import { useConexion } from '@/hooks/useConexion';
+import { useConexion } from '@/utils/useConexion';
 import { esErrorApi } from '@/services/api';
 import { buscarConvenios, FILTROS_INICIALES, FiltrosBusqueda } from '@/services/convenios.service';
 import { useTema } from '@/tema/ProveedorTema';
@@ -105,7 +105,7 @@ export default function Buscar() {
 
     return (
         <View style={{ flex: 1, backgroundColor: colores.background }}>
-            <EncabezadoPantalla titulo="Buscar convenios" onVolver={() => router.back()}>
+            <EncabezadoPantalla titulo="Buscar convenios" onVolver={() => router.back()} ayuda="buscar">
                 <CampoBusqueda valor={texto} onCambio={setTexto} autoFocus={!q} />
             </EncabezadoPantalla>
 

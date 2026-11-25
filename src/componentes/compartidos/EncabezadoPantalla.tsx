@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTema } from '@/tema/ProveedorTema';
 import { Texto } from '../atomos/Texto';
+import { ModalAyuda } from '@/componentes/ayuda/ModalAyuda';
+import { SeccionAyuda } from '@/utils/contenidoAyuda';
 
 type Accion = {
     icono?: keyof typeof Ionicons.glyphMap;
@@ -17,12 +19,14 @@ type Props = {
     subtitulo?: string;
     onVolver?: () => void;
     accion?: Accion;
+    ayuda?: SeccionAyuda; // si se pasa, aparece el "?" con la ayuda de esa sección
     children?: ReactNode; // contenido debajo del título (por ejemplo, el buscador)
 };
 
-export function EncabezadoPantalla({ titulo, subtitulo, onVolver, accion, children }: Props) {
+export function EncabezadoPantalla({ titulo, subtitulo, onVolver, accion, ayuda, children }: Props) {
     const { colores } = useTema();
     const insets = useSafeAreaInsets();
+    const [ayudaVisible, setAyudaVisible] = useState(false);
 
     return (
         <View
@@ -60,6 +64,18 @@ export function EncabezadoPantalla({ titulo, subtitulo, onVolver, accion, childr
             </Texto>
             </View>
 
+            {ayuda ? (
+                <Pressable
+                    onPress={() => setAyudaVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ayuda de esta pantalla"
+                    hitSlop={8}
+                    style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                >
+                    <Ionicons name="help-circle-outline" size={28} color={colores.headerText} />
+                </Pressable>
+            ) : null}
+
             {accion ? (
             <Pressable
                 onPress={accion.onPress}
@@ -75,6 +91,10 @@ export function EncabezadoPantalla({ titulo, subtitulo, onVolver, accion, childr
         </View>
 
         {children}
+
+        {ayuda ? (
+            <ModalAyuda seccion={ayuda} visible={ayudaVisible} onCerrar={() => setAyudaVisible(false)} />
+        ) : null}
         </View>
     );
 }
