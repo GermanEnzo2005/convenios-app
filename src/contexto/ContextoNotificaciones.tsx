@@ -1,19 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { esErrorApi } from '@/services/api';
-import { avisarAhora, cancelarAvisos, configurarNotificaciones, programarAvisos } from '@/services/avisos.service';
+import { avisarNotificacionesNuevas, cancelarAvisos, configurarNotificaciones, programarAvisos } from '@/services/avisos.service';
 import { buscarConvenios, FILTROS_INICIALES } from '@/services/convenios.service';
 import {
     marcarLeida as marcarLeidaApi,
     marcarTodasLeidas as marcarTodasApi,
     obtenerNotificaciones,
 } from '@/services/notificaciones.service';
+import { cancelarSegundoPlano, registrarSegundoPlano } from '@/services/segundoPlano.service';
 import { Notificacion } from '@/types/notificacion';
 import { useSesion } from './ContextoSesion';
 
 const INTERVALO_MS = 60 * 1000; // consulta cada minuto mientras la app está abierta
-const claveUltimoId = (usuarioId: number) => `notif_ultimo_id_${usuarioId}`;
 
 type ValorNotificaciones = {
     notificaciones: Notificacion[];
@@ -28,7 +27,7 @@ type ValorNotificaciones = {
 const ContextoNotificaciones = createContext<ValorNotificaciones | null>(null);
 
 export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
-    const { token, usuario, cerrarSesion } = useSesion();
+    const { token, usuario, cargando, cerrarSesion } = useSesion();
     const usuarioId = usuario?.id ?? null;
 
     const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -50,21 +49,8 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
         pendientesRef.current = aprobados.total;
         setError(null);
 
-        // Aviso del sistema por cada notificación nueva: id mayor al último visto en este celular.
-        // La primera vez solo se guarda el último id, para no avisar de todo el historial.
-        const clave = claveUltimoId(usuarioId);
-        const guardado = await AsyncStorage.getItem(clave);
-        const maximo = lista.notificaciones.reduce((m, n) => Math.max(m, n.id), 0);
-        if (guardado !== null) {
-            const ultimo = Number(guardado);
-            const nuevas = lista.notificaciones.filter((n) => n.id > ultimo && !n.leida).sort((a, b) => a.id - b.id);
-            for (const n of nuevas.slice(-3)) {
-            await avisarAhora(n.titulo, n.mensaje, { convenioId: n.convenioId });
-            }
-        }
-        if (guardado === null || maximo > Number(guardado)) {
-            await AsyncStorage.setItem(clave, String(maximo));
-        }
+        // Aviso del sistema por cada notificación nueva (llega al celular aunque esté bloqueado).
+        await avisarNotificacionesNuevas(usuarioId, lista.notificaciones);
         } catch (e) {
         if (esErrorApi(e) && e.estado === 401) {
             await cerrarSesion();
@@ -78,6 +64,13 @@ export function ProveedorNotificaciones({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (token) configurarNotificaciones().catch(() => {});
     }, [token]);
+
+    // Tarea de segundo plano: con la app cerrada o en segundo plano, el sistema la ejecuta cada tanto,
+    // consulta la API y muestra un aviso en el celular por cada notificación nueva.
+    useEffect(() => {
+        if (token) registrarSegundoPlano().catch(() => {});
+        else if (!cargando) cancelarSegundoPlano().catch(() => {});
+    }, [token, cargando]);
 
     // Carga inicial y consulta periódica mientras la app está abierta.
     useEffect(() => {

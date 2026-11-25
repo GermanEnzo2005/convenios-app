@@ -1,5 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { Notificacion } from '@/types/notificacion';
 
 const CANAL = 'avisos';
 
@@ -42,6 +44,28 @@ export async function avisarAhora(titulo: string, mensaje: string, datos?: Recor
         content: { title: titulo, body: mensaje, data: datos },
         trigger: { channelId: CANAL },
     });
+}
+
+const claveUltimoId = (usuarioId: number) => `notif_ultimo_id_${usuarioId}`;
+
+// Muestra un aviso del sistema por cada notificación nueva (id mayor al último visto en este celular).
+// La primera vez solo guarda el último id, para no avisar de todo el historial.
+// Lo usan la app abierta (ContextoNotificaciones) y la tarea de segundo plano (segundoPlano.service).
+export async function avisarNotificacionesNuevas(usuarioId: number, lista: Notificacion[]): Promise<void> {
+    const clave = claveUltimoId(usuarioId);
+    const guardado = await AsyncStorage.getItem(clave);
+    const maximo = lista.reduce((m, n) => Math.max(m, n.id), 0);
+
+    if (guardado !== null) {
+        const ultimo = Number(guardado);
+        const nuevas = lista.filter((n) => n.id > ultimo && !n.leida).sort((a, b) => a.id - b.id);
+        for (const n of nuevas.slice(-3)) {
+            await avisarAhora(n.titulo, n.mensaje, { convenioId: n.convenioId });
+        }
+    }
+    if (guardado === null || maximo > Number(guardado)) {
+        await AsyncStorage.setItem(clave, String(maximo));
+    }
 }
 
 export async function cancelarAvisos(): Promise<void> {
