@@ -74,7 +74,7 @@ export default function FirmarConvenio() {
   if (!enLinea && paso === 'huella') {
     return (
         <PantallaSinConexion titulo="Firmar convenio" subtitulo={codigo}
-            mensaje="Para firmar un convenio necesitás conexión a internet." onVolver={() => router.back()} />
+            mensaje="Para firmar un convenio necesitás conexión a internet." onVolver={() => router.back()} ayuda="firmar" />
     );
 }
 

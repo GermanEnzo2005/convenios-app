@@ -75,7 +75,7 @@ export default function Comentarios() {
     if (!enLinea) {
         return (
             <PantallaSinConexion titulo="Comentarios" subtitulo={codigo}
-                mensaje="Sin internet no podés ver ni escribir comentarios." onVolver={() => router.back()} />
+                mensaje="Sin internet no podés ver ni escribir comentarios." onVolver={() => router.back()} ayuda="comentarios" />
         );
     }
 

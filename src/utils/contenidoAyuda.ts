@@ -29,11 +29,11 @@ export const GUIAS: GuiaAyuda[] = [
         descripcion: 'Necesitás conexión a internet y tu identidad registrada.',
         pasos: [
             { titulo: 'Elegí el convenio', detalle: 'En el Home, tocá "Ver convenio" en la lista "Para firmar".' },
-            { titulo: 'Revisá los datos', detalle: 'Controlá procedencia, firmantes, fechas y convenio padre (si tiene).' },
-            { titulo: 'Leé el documento completo', detalle: 'Desplazate hasta el final del PDF. Podés hacer zoom con dos dedos.' },
-            { titulo: 'Tocá Firmar', detalle: 'El botón aparece al final de la lectura.' },
-            { titulo: 'Confirmá tu identidad', detalle: 'Usá tu huella digital y luego tu firma a mano en la pantalla.' },
-            { titulo: 'Listo', detalle: 'El documento queda firmado, con fecha, hora y ubicación del momento de la firma.' },
+            { titulo: 'Revisá los datos', detalle: 'Controlá las partes, las fechas y el convenio de origen (si tiene).' },
+            { titulo: 'Leé el documento', detalle: 'En "Documentos" tocá "Ver PDF". Podés hacer zoom con dos dedos.' },
+            { titulo: 'Tocá Firmar convenio', detalle: 'El botón aparece al final del detalle, solo si el convenio está aprobado.' },
+            { titulo: 'Confirmá con tu huella', detalle: 'Apoyá el dedo en el sensor cuando el celular te lo pida.' },
+            { titulo: 'Dibujá tu firma', detalle: 'Firmá en el recuadro y tocá Confirmar. Se registran fecha, hora y ubicación.' },
         ],
     },
 ];
